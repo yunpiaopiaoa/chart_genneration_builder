@@ -1,0 +1,14 @@
+[build_llm]
+base_url=https://your_url
+model=your_model_name
+api_key=your_api_key
+[eval_llm]
+base_url=https://your_url
+model=your_model_name
+api_key=your_api_key
+[judge_llm]
+base_url=https://your_url
+model=your_model_name
+api_key=your_api_key
+[chartx_config]
+data_dir=path_to/datasets/ChartX
