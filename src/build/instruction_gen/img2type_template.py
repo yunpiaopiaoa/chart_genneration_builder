@@ -33,11 +33,11 @@ class Img2TypeTemplate(BaseInstructionTemplate):
         query+=self.templates[self.language]["constrain"]
         answer = chart_data["type"]
         messages: list[Message] = [
-            {"role": "user", "contents": [{"modality": "text", "value": query},{"modality": "image", "value": "<image>"}]},
-            {"role": "assistant", "contents": [{"modality": "text", "value": answer}]},
+            {"role": "user", "content": [{"type": "text", "value": query},{"type": "image", "value": "<image>"}]},
+            {"role": "assistant", "content": [{"type": "text", "value": answer}]},
         ]
         instance: InstructionData = {
             "task": self.task,
-            "conversations": messages,
+            "messages": messages,
         }
         return instance

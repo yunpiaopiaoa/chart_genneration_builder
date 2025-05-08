@@ -1,6 +1,7 @@
 # from playwright.async_api import async_playwright
 from http.server import SimpleHTTPRequestHandler
 import os
+from pathlib import Path
 import re
 import socketserver
 import threading
@@ -26,7 +27,11 @@ class EchartsImgGenerator(BaseImgGenerator):
         self.server_thread = threading.Thread(target=self.httpd.serve_forever)
         self.server_thread.start()
         print(f"EchartsImgGenerator:服务器已启动，监听端口 {self.port}")
-
+        curdir = Path(__file__).parent
+        with (curdir.parent  / "code_gen" / "template.html").open(
+            "r", encoding="utf-8"
+        ) as f:
+            self.html_template = f.read()
     def cleanup(self):
         if self.browser is not None:
             self.browser.close()
@@ -42,33 +47,29 @@ class EchartsImgGenerator(BaseImgGenerator):
             self.server_thread.join()
         print(f"EchartsImgGenerator:服务器线程已结束")
 
-    def generate_img(self, code: str, save_path: str):
-        # print("generate_img:",save_path)
+    def generate_img(self, code: str, save_path: str,width=1000,height=800):
         """借助无头浏览器渲染 ECharts 图表并保存为图片"""
-        # 加载 ECharts 示例代码
-        # self.page.set_content(code)
-        # # 等待图表渲染完成
-        # # WARNING:使用选择器等待图表渲染完成，若模板修改的话，注意#chart是否为图表挂载的dom元素id
-        # # self.page.wait_for_selector('#chart')
-        # self.page.wait_for_timeout(3000)
-        # # 保存为图片
-        # self.page.screenshot(path=save_path)
-        page = self.browser.new_page(viewport={"width": 1000, "height": 800})
+
+        if not re.search(r"<html>", code):#如果不存在html标签，说明是js代码，需要使用模板包裹起来
+            code=self.html_template.format(script=code)
+            match = re.search(r'getElementById\((["\'])(.*?)\1\)', code)
+            id = match.group(2)#找到图表挂载dom元素id
+            code = code.replace('<div id="chart"', f'<div id="{id}"')
+        page = self.browser.new_page(viewport={"width": width, "height": height})
         content = re.sub(
             r'src="[^"]*"',
             f'src="http://localhost:{self.port}/lib/echarts.min.js"',
             code,
         )
         page.set_content(content, wait_until="load")
-        # page.wait_for_selector('#chart')
-        # WARNING：找不到一个通用的方法确定页面完全加载,暂定3000ms
-        page.wait_for_timeout(3000)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        #找到
         pattern = r'getElementById\((["\'])(.*?)\1\)'
         match = re.search(pattern, code)
-        idx = match.group(2)
-        element=page.query_selector(f"id={idx}")
+        id = match.group(2)
+        # WARNING：找不到一个通用的方法确定页面完全加载,暂定3000ms
+        page.wait_for_selector(f"#{id}", state="visible")
+        page.wait_for_timeout(3000)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        element=page.query_selector(f"id={id}")
         element.screenshot(path=save_path)
         page.close()
 

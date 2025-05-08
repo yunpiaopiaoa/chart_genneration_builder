@@ -7,6 +7,7 @@ from langchain_core.prompts import PromptTemplate
 from src.datamodel.annotation import ChartData, InstructionData
 from src.datamodel.annotation import CodeData
 from src.datamodel.annotation import Message
+from src.utils.extract import extract_block
 from .base_template import BaseInstructionTemplate
 
 
@@ -17,7 +18,7 @@ class QATemplate(BaseInstructionTemplate):
         super().__init__(language)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler("log/QAInstructionTemplate.log")
+        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
@@ -31,7 +32,7 @@ class QATemplate(BaseInstructionTemplate):
             你可以考虑从图表数据提取、颜色和形状等视觉元素、图表描述和总结等角度去构造一个询问,并且自行给出准确的回答。
             示例：
             {case_str}
-            请构造一个类似的询问-回答对，要求符合json格式，包含query和answer两个字段，字段值采用{language}语言,不要出现多余的```等代码块，也不要返回多个json对象。
+            请构造一个类似的询问-回答对，要求符合json格式，包含query和answer两个字段，字段值采用{language}语言,也不要返回多个json对象。
         """
         prompt = PromptTemplate.from_template(textwrap.dedent(template))
         self.chain = prompt | model
@@ -51,23 +52,28 @@ class QATemplate(BaseInstructionTemplate):
         }
         outputs = self.chain.invoke(inputs)
         try:
-            dic = json.loads(outputs.content)
+            dic = json.loads(extract_block(outputs.content))
             query = dic["query"]
             answer = dic["answer"]
 
             messages: list[Message] = [
                 {
                     "role": "user",
-                    "contents": [{"modality": "text", "value": query}],
+                    "content": [
+                        {"type": "text", "value": "这是图表数据：<chart_data>"},
+                        {"type": "text", "value": "这是代码：<code>"},
+                        {"type": "image", "value": "这是图片：<image>"},
+                        {"type": "text", "value": query},
+                    ],
                 },
                 {
                     "role": "assistant",
-                    "contents": [{"modality": "text", "value": answer}],
+                    "content": [{"type": "text", "value": answer}],
                 },
             ]
             instance: InstructionData = {
                 "task": self.task,
-                "conversations": messages,
+                "messages": messages,
             }
             return instance
         except json.JSONDecodeError as e:

@@ -1,8 +1,9 @@
 from collections import defaultdict
-from curses.ascii import isalnum
 import json
 import numbers
+import os
 from pathlib import Path
+from typing import Iterable
 
 
 from langchain_openai import ChatOpenAI
@@ -11,15 +12,14 @@ from langchain_core.messages import BaseMessage
 
 from src.datamodel.infer_result import InferResult, TaskResult
 from src.eval.eval_template import EvalTemplateDict
-from src.build.generator.img_gen.base_img_generator import BaseImgGenerator
+from src.utils.extract import extract_block
 from src.utils.img_similarity import img_similarity
 from src.utils.dict_similarity import dict_similarity
 
 
 class EvalProcess:
-    def __init__(self, judge_llm: ChatOpenAI, chart_img_gen: BaseImgGenerator):
+    def __init__(self, judge_llm: ChatOpenAI):
         self.judge_llm = judge_llm
-        self.chart_img_gen = chart_img_gen
         self.eval_templates = EvalTemplateDict()
         vision_chains: dict[str, Runnable] = {}
         for critic_name, template in self.eval_templates.vision_templates():
@@ -31,54 +31,82 @@ class EvalProcess:
             text_chains[critic_name] = template | self.judge_llm
         self.text_chain = RunnableParallel(**text_chains)
 
-    def eval(self, infer_results: list[InferResult], eval_path: Path):
+    def eval(self, infer_results: Iterable[tuple[InferResult, Path]]):
         eval_results: dict[str, dict[str, list[float]]] = defaultdict(dict)
-        for infer_result in infer_results:
+        for infer_result, infer_path in infer_results:
             for task_result in infer_result["task_results"]:
                 task_name = task_result["task"]
                 if task_name.endswith("type"):  # img2type,code2type
                     metrics = self._eval_type(
                         task_result["prediction"],
-                        task_result["ground_truth"]["contents"][0]["value"],
+                        task_result["ground_truth"]["content"][0]["value"],
                     )
                 elif task_name.endswith("code"):  # img2code,data2code,text2code
+                    code = extract_block(task_result["prediction"])  # 提取代码块
                     metrics = self._eval_code(
-                        task_result["prediction"],
+                        code,
                         infer_result["img_path"],
-                        task_name,
+                        infer_path / f"{task_name}.png",
                         task_name == "img2code",
-                        eval_path,
                     )
                 elif task_name.endswith("data"):  # img2data,code2data,text2data
-                    metrics = self._eval_data(
-                        task_result, infer_result["chart_data"]["data"]
-                    )
+                    data_block = extract_block(task_result["prediction"])
+                    ##WARNING:如果为字典列表，而不是key:[value]格式，需要转换格式
+                    try:
+                        pred_dict = json.loads(data_block)
+                        if isinstance(pred_dict, list):
+                            convert_dict = {}
+                            for dic in pred_dict:
+                                for k, v in dic.items():
+                                    convert_dict.setdefault(k, []).append(v)
+                            pred_dict = convert_dict
+                        metrics = self._eval_data(
+                            pred_dict, infer_result["chart_data"]["data"]
+                        )
+                    except json.JSONDecodeError as e:  # 如果json解析失败
+                        print(f"Error: {e}")
+                        metrics = {"data_similarity": 0.0}
                 elif task_name.endswith("text"):  # img2text
                     metrics = self._eval_text(task_result, infer_result["img_path"])
                 elif task_name == "qa":
-                    metrics = self.eval_qa(task_result)
+                    metrics = self.eval_qa(
+                        task_result,
+                        infer_result["chart_data"]["data"],
+                        infer_result["img_path"],
+                    )
                 else:
                     raise ValueError(f"Unsupported task: {task_name}")
                 for item, score in metrics.items():
                     eval_results[task_name].setdefault(item, []).append(score)
-                    print(f"{task_name} {item}: {score}")
+                    # print(f"{task_name} {item}: {score}")
         return eval_results
 
-    def eval_qa(self, task_result: TaskResult):
-        """评估qa问答与原图的相关性
-        TODO
-        """
-        return {"relation": 1}
+    def eval_qa(
+        self, task_result: TaskResult, chart_data: dict[str, list], img_path: str
+    ):
+        """评估qa问答与原图表的相关性"""
+        prompt_value = self.eval_templates.qa_template().invoke(
+            {
+                "chart_data": chart_data,
+                "code": "?",  # WARNING:这里需要外部传入code参数
+                "img_path": img_path,
+                "query": task_result["question"][-1],  ##WARNING:严重的耦合
+                ##task_result["question"]是待评估模型需要回答的query，包含图表数据，代码和图片,用户询问
+                ##task_result["question"][-1]是用户询问
+                "answer": task_result["prediction"],
+            }
+        )
+        response = self.judge_llm.invoke(prompt_value)
+        return {"relation": int(response.content)}
 
     def _eval_type(self, predicted_type: str, true_type: str):
-        """比较预测图表类型和真实图表类型
-        TODO:后续可能允许真实类型和预测类型相近即可，需要定义图表类型之间的相似分数矩阵
-        """
+        """比较预测图表类型和真实图表类型"""
         metrics = {"type_similarity": int(predicted_type == true_type)}
         return metrics
 
-    def _eval_data(self, task_result: TaskResult, chart_data: dict[str, list]):
-        score = dict_similarity(json.loads(task_result["prediction"]), chart_data)
+    def _eval_data(self, pred_dict: TaskResult, chart_data: dict[str, list]):
+        # print(pred_dict)
+        score = dict_similarity(pred_dict, chart_data)
         return {"data_similarity": score}
 
     def _eval_text(self, task_result: TaskResult, img_path: str):
@@ -95,34 +123,31 @@ class EvalProcess:
         self,
         code: str,
         img_path: str,
-        task_name: str,
+        infer_img_path: str,
         need_img_similarity: bool,
-        eval_path: Path,
     ):
         metrics: dict[str, float] = {}
         try:
-            eval_img_path = str(
-                eval_path
-                / "img"
-                / f"{"_".join(img_path.split("/")[:2])}_{task_name}.png"
-            )
-            self.chart_img_gen.generate_img(code, eval_img_path)
+            assert os.path.exists(infer_img_path)
             metrics["code_success_rate"] = 1
             if need_img_similarity:
-                metrics["img_similarity"] = float(img_similarity(img_path, eval_img_path))
+                metrics["img_similarity"] = float(
+                    img_similarity(img_path, infer_img_path)
+                )
             # 计算图片视觉评价
-            responses: dict[str, BaseMessage] = self.vision_chain.invoke(eval_img_path)
+            responses: dict[str, BaseMessage] = self.vision_chain.invoke(infer_img_path)
             for critic_name, response in responses.items():
-                content=response.content
-                print(critic_name,content)
+                content = response.content
                 if content.isalnum():
                     score = int(response.content)
                 else:
                     try:
-                        data=json.loads(content)
+                        data = json.loads(content)
                         ##content附带的评分理由会被过滤掉
-                        scores=[v for v in data.values() if isinstance(v, numbers.Number)]
-                        score=sum(scores)/len(scores)
+                        scores = [
+                            v for v in data.values() if isinstance(v, numbers.Number)
+                        ]
+                        score = sum(scores) / len(scores)
                     except Exception as e:
                         print(e)
                 metrics[critic_name] = score

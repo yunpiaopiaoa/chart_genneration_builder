@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from src.datamodel.infer_result import InferResult
 from src.eval.eval_process import EvalProcess
-from src.build.generator.img_gen.echarts_img_generator import EchartsImgGenerator
+from src.build.img_gen.echarts_img_generator import EchartsImgGenerator
 
 
 def main(infer_dir: str, eval_dir: str):
@@ -23,18 +23,18 @@ def main(infer_dir: str, eval_dir: str):
         api_key=config["api_key"],
         temperature=0,##确保评估稳定性
     )
+    
+    def all_infer_results(infer_dir: Path):
+        for sub_dir in infer_dir.iterdir():
+            with (sub_dir / "infer_result.json").open("r", encoding="utf-8") as f:
+                infer_result:InferResult=json.load(f)
+                yield infer_result,sub_dir
 
-    infer_result_path = cur_dir / infer_dir / "infer_result.json"
-    results: list[InferResult] = []
-    with infer_result_path.open("r", encoding="utf-8") as f:
-        results = json.load(f)
-
+    infer_result_path = cur_dir / infer_dir
     eval_path = cur_dir / eval_dir
     eval_path.mkdir(parents=True, exist_ok=True)
-    chart_img_gen = EchartsImgGenerator()
-    ep = EvalProcess(judge_llm, chart_img_gen)
-    eval_results = ep.eval(results, eval_path)
-    chart_img_gen.cleanup()
+    ep = EvalProcess(judge_llm)
+    eval_results = ep.eval(all_infer_results(infer_result_path))
 
     # 保存评估结果
     with (eval_path / "eval_results.json").open("w", encoding="utf-8") as f:

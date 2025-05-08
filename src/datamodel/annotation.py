@@ -2,7 +2,6 @@ import base64
 from io import BytesIO
 from typing import Literal, TypedDict
 
-from PIL.ImageFile import ImageFile
 from PIL import Image
 from src.datamodel.task_type import TaskType
 
@@ -13,10 +12,10 @@ class ChartData(TypedDict):
     其中key为表头,value为key所在列的元素
     """
 
-    title: str = "Chart Title"
-    description: str = ""
-    type: str = "unknown"
-    data: dict = {}
+    title: str 
+    description: str 
+    type: str 
+    data: dict 
 
 
 class CodeData(TypedDict):
@@ -26,11 +25,22 @@ class CodeData(TypedDict):
     code: str
 
 
+# class TextContent(TypedDict):
+#     type: Literal["text"]
+#     text: str
+
+# class ImageContent(TypedDict):
+#     type: Literal["image_url"]
+#     image_url: dict[str, str]  # 或进一步定义嵌套结构
+
+# MessageContent = Union[TextContent, ImageContent]
+
+
 class MessageContent(TypedDict):
     """消息内容"""
 
-    modality: str = Literal["text", "image"]
-    value: str | ImageFile  # 支持文本或图像
+    type: str = Literal["text", "image"]# 支持文本或图像
+    value: str  #type="image"时，值为base64编码
 
 
 class Message(TypedDict):
@@ -39,7 +49,7 @@ class Message(TypedDict):
     """
 
     role: Literal["user", "assistant"]
-    contents: list[MessageContent]
+    content: str | list[MessageContent]
 
 
 class InstructionData(TypedDict):
@@ -49,20 +59,23 @@ class InstructionData(TypedDict):
     """
 
     task: TaskType
-    conversations: list[Message]
+    messages: list[Message]
 
 
 class Annotation(TypedDict):
     chart: ChartData
     code: CodeData
-    img_path: str
+    # img_path: str
     instructions: list[InstructionData]
 
 
 def encode_base64(img_path: str):
+    """返回图片的base64编码，附带data:image/jpeg;base64,前缀"""
     img = Image.open(img_path)
     if img.mode != "RGB":
         img = img.convert("RGB")
     buffered = BytesIO()
     img.save(buffered, format="JPEG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    res = "data:image/jpeg;base64,"
+    res += base64.b64encode(buffered.getvalue()).decode("utf-8")
+    return res

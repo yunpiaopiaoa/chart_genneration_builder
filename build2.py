@@ -2,9 +2,7 @@ import argparse
 import configparser
 from pathlib import Path
 from langchain_openai import ChatOpenAI
-from src.build.build_process import BuildProcess
-from src.build.data_gen.chartx_data_generator import ChartxDataGenerator
-from src.build.code_gen.echarts_html_generator_llm import EchartsHtmlGeneratorLLM
+from src.build.build_process2 import BuildProcessForEchartsExample
 from src.build.img_gen.echarts_img_generator import EchartsImgGenerator
 from src.build.instruction_gen.instruction_gen import InstructionGen
 
@@ -24,14 +22,15 @@ def main(gen_count: int, sample_dir: str):
 
     # 定义生成器
     # data_gen = LLMDataGenerator(llm)
-    data_gen = ChartxDataGenerator(**dict(con["chartx_config"]))
-    code_gen = EchartsHtmlGeneratorLLM(llm)
+    # data_gen = ChartxDataGenerator(**dict(con["chartx_config"]))
+    # code_gen = EchartsHtmlGeneratorLLM(llm)
     chart_img_gen = EchartsImgGenerator()
     instruction_gen = InstructionGen(llm, language="zh")
 
-    bp = BuildProcess(llm, data_gen, code_gen, chart_img_gen, instruction_gen)
-    bp.build(gen_count, cur_dir / sample_dir)
-
+    data_path = Path("echarts_examples")
+    bp = BuildProcessForEchartsExample(llm,chart_img_gen, instruction_gen)
+    bp.build(gen_count,data_path, cur_dir / sample_dir)
+    chart_img_gen.cleanup()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build charts and annotations.")

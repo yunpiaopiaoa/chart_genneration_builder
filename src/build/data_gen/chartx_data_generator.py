@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 import random
-from src.build.generator.data_gen.base_data_generator import BaseDataGenerator
+from src.build.data_gen.base_data_generator import BaseDataGenerator
 from src.datamodel.annotation import ChartData
 
 

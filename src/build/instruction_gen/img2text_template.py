@@ -28,13 +28,14 @@ class Img2TextTemplate(BaseInstructionTemplate):
     def get_instance(self, chart_data: ChartData, code_data: CodeData) :
         query_template = random.choice(self.templates[self.language]["query"])
         query = query_template
-        answer = chart_data["description"]
+        # answer = chart_data["description"]
+        answer="<description>"
         messages: list[Message] = [
-            {"role": "user", "contents": [{"modality": "text", "value": query},{"modality": "image", "value": "<image>"}]},
-            {"role": "assistant", "contents": [{"modality": "text", "value": answer}]},
+            {"role": "user", "content": [{"type": "text", "value": query},{"type": "image", "value": "<image>"}]},
+            {"role": "assistant", "content": [{"type": "text", "value": answer}]},
         ]
         instance: InstructionData = {
             "task": self.task,
-            "conversations": messages,
+            "messages": messages,
         }
         return instance

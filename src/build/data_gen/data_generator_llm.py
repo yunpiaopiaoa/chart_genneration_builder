@@ -13,7 +13,7 @@ class LLMDataGenerator(BaseDataGenerator):
     def __init__(self,model:ChatOpenAI):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler("log/LLMDataGenerator.log")
+        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)

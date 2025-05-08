@@ -14,11 +14,11 @@ class Text2DataTemplate(BaseInstructionTemplate):
                 "query": [
                     "Please generate chart data based on the chart description:<description>"
                 ],
-                "constrain": "Please return the chart data in JSON format, with the column titles as keys and the column data as values. Do not use ``` or other code block formats.",
+                "constrain": "Please return the chart data in JSON format, with the column titles as keys and the column data as values.",
             },
             "zh": {
                 "query": ["请根据图表描述生成图表数据：<description>"],
-                "constrain": "返回JSON格式数据，键为列标题，值为列数据列表，不要使用```或其他代码块格式。",
+                "constrain": "返回JSON格式字典，字典的键值对的值是扁平的数据列表。",
             },
         }
 
@@ -30,14 +30,14 @@ class Text2DataTemplate(BaseInstructionTemplate):
         messages: list[Message] = [
             {
                 "role": "user",
-                "contents": [
-                    {"modality": "text", "value": query},
+                "content": [
+                    {"type": "text", "value": query},
                 ],
             },
-            {"role": "assistant", "contents": [{"modality": "text", "value": answer}]},
+            {"role": "assistant", "content": [{"type": "text", "value": answer}]},
         ]
         instance: InstructionData = {
             "task": self.task,
-            "conversations": messages,
+            "messages": messages,
         }
         return instance

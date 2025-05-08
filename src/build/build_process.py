@@ -4,10 +4,10 @@ import logging
 from pathlib import Path
 from tqdm import tqdm
 from src.datamodel.annotation import Annotation
-from src.build.generator.code_gen.base_code_generator import BaseCodeGenerator
-from src.build.generator.data_gen.base_data_generator import BaseDataGenerator
-from src.build.generator.img_gen.base_img_generator import BaseImgGenerator
-from src.build.generator.instruction_gen.instruction_gen_llm import InstructionGen
+from src.build.code_gen.base_code_generator import BaseCodeGenerator
+from src.build.data_gen.base_data_generator import BaseDataGenerator
+from src.build.img_gen.base_img_generator import BaseImgGenerator
+from src.build.instruction_gen.instruction_gen import InstructionGen
 
 
 class BuildProcess:
@@ -21,7 +21,7 @@ class BuildProcess:
     ):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler("log/build.log")
+        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
@@ -79,7 +79,7 @@ class BuildProcess:
         annotation = Annotation(
             chart=chart_data,
             code=code_data,
-            img_path=f"{target_dir.parent.stem}/{target_dir.stem}/chart.png",
+            # img_path=f"{target_dir.parent.stem}/{target_dir.stem}/chart.png",
             instructions=instructions,
         )
         (target_dir / "annotation.json").write_text(

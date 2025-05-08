@@ -33,11 +33,11 @@ class Data2TypeTemplate(BaseInstructionTemplate):
         query+=self.templates[self.language]["constrain"]
         answer = chart_data["type"]
         messages: list[Message] = [
-            {"role": "user", "contents": [{"modality": "text", "value": query}]},
-            {"role": "assistant", "contents": [{"modality": "text", "value": answer}]},
+            {"role": "user", "content": [{"type": "text", "value": query}]},
+            {"role": "assistant", "content": [{"type": "text", "value": answer}]},
         ]
         instance: InstructionData = {
             "task": self.task,
-            "conversations": messages,
+            "messages": messages,
         }
         return instance

@@ -7,13 +7,13 @@ from langchain_core.prompts import PromptTemplate
 
 from src.datamodel.annotation import ChartData
 from src.datamodel.annotation import CodeData
-from src.build.generator.code_gen.base_code_generator import BaseCodeGenerator
+from src.build.code_gen.base_code_generator import BaseCodeGenerator
 
 class EchartsHtmlGeneratorLLM(BaseCodeGenerator):
     def __init__(self, model:ChatOpenAI):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler("log/EchartsHtmlGeneratorLLM.log")
+        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
@@ -55,4 +55,4 @@ class EchartsHtmlGeneratorLLM(BaseCodeGenerator):
             codedata=CodeData(language="echarts",code=compressed_html_code)
             return codedata
         except Exception as e:
-            self.logger.error(f"Generate code failed:{e}")
+            self.logger.error(f"Generate html code failed:{e}")

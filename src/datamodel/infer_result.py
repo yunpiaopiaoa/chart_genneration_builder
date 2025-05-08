@@ -6,7 +6,7 @@ from src.datamodel.task_type import TaskType
 
 class TaskResult(TypedDict):
     task: TaskType
-    query: list[Message]
+    question: list[Message]
     ground_truth: Message
     prediction: str
 
