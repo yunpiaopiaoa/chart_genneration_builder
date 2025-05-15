@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from PIL import Image
 from src.datamodel.task_type import TaskType
@@ -59,6 +59,7 @@ class InstructionData(TypedDict):
     """
 
     task: TaskType
+    scene:NotRequired[str]#任务下的具体场景，非必须
     messages: list[Message]
 
 

@@ -10,7 +10,13 @@ from src.build.img_gen.base_img_generator import BaseImgGenerator
 from src.build.instruction_gen.instruction_gen import InstructionGen
 
 
-class BuildProcess:
+class BuildProcessForChartX:
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.ERROR)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     def __init__(
         self,
         llm,
@@ -19,12 +25,6 @@ class BuildProcess:
         chart_img_gen: BaseImgGenerator,
         instruction_gen: InstructionGen,
     ):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
 
         self.llm = llm
         self.data_gen = data_gen
@@ -43,14 +43,9 @@ class BuildProcess:
                     target_dir.mkdir(exist_ok=True)
                     chart_data = self.data_gen.generate_data()
 
-                    # 第一阶段：保存数据 + 生成代码
+                    # 第一阶段：生成代码
                     future_code = executor.submit(
                         self.code_gen.generate_code, chart_data
-                    )
-                    executor.submit(
-                        (target_dir / "data.json").write_text,
-                        json.dumps(chart_data, ensure_ascii=False, indent=4),
-                        encoding="utf-8",
                     )
                     code_data = future_code.result()
 
@@ -72,14 +67,12 @@ class BuildProcess:
                     self.chart_img_gen.generate_img(code_data["code"], str(img_path))
                 except Exception as e:
                     self.logger.error(f"Failed to build at {i}, error: {e}")
-        self.chart_img_gen.cleanup()
 
     def gen_annotation(self, chart_data, code_data, target_dir: Path):
         instructions = self.instruction_gen.generate_instruction(chart_data, code_data)
         annotation = Annotation(
             chart=chart_data,
             code=code_data,
-            # img_path=f"{target_dir.parent.stem}/{target_dir.stem}/chart.png",
             instructions=instructions,
         )
         (target_dir / "annotation.json").write_text(

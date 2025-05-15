@@ -21,94 +21,33 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from src.datamodel.annotation import encode_base64
 
-class EvalImgTemplate(Runnable):
-    def __init__(self, critic: str, case_image_path: str, case_eval_output: dict):
-        
-        self.template_with_case = ChatPromptTemplate.from_messages(
-            [
-                SystemMessage(critic),
-                HumanMessage(
-                    [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": encode_base64(case_image_path)
-                            },
-                        },
-                    ]
-                ),
-                AIMessage(
-                    [
-                        {
-                            "type": "text",
-                            # "text": case_output,
-                            "text": json.dumps(case_eval_output, ensure_ascii=False),
-                        },
-                    ],
-                ),
-                HumanMessagePromptTemplate.from_template(
-                    [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": "{image_url}"},
-                        },
-                    ]
-                ),
-            ]
-        )
-
-        self.template_no_case = ChatPromptTemplate.from_messages(
-            [
-                SystemMessage(critic),
-                HumanMessagePromptTemplate.from_template(
-                    [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": "{image_url}"},
-                        },
-                    ]
-                ),
-            ]
-        )
-
-    def invoke(self, img_path: str, with_case: bool = False):
-        if with_case:
-            return self.template_with_case.invoke({"image_url": encode_base64(img_path)})
-        return self.template_no_case.invoke({"image_url": encode_base64(img_path)})
-
 class EvalTemplate(Runnable):
     
-    def __init__(self,eval_critic_dict:dict):
+    def __init__(self,eval_critic_dict:dict,infer_query:list[dict]=None):
         super().__init__()
         messages=[]
         self.eval_critic_dict=eval_critic_dict
         for mes in eval_critic_dict['messages']:
             content=self.formalize_message(mes['content'])
             if mes['role']=='user':
-                messages.append(HumanMessagePromptTemplate.from_template(content))
+                messages.append(HumanMessagePromptTemplate.from_template(content,infer_query))
             elif mes['role']=='system':
-                messages.append(SystemMessage(content))
+                messages.append(SystemMessage(content,infer_query))
             elif mes['role']=='assistant':
-                messages.append(AIMessage(content))
+                messages.append(AIMessage(content,infer_query))
         self.template=ChatPromptTemplate.from_messages(messages)
     
-    def invoke(self, img_path: str, config: dict=None):
-        return self.template.invoke({"image_url": encode_base64(img_path)})
+    def invoke(self, infer: dict, config: dict=None):
+        return self.template.invoke(infer)
     
-    def formalize_message(self,mes:str)->list:
-        parts = re.findall(r'[^<]+|<[^>]+>', mes)
+    def formalize_message(self,mes:str,query=None)->list:
+        # parts = re.findall(r'[^<]+|<[^>]+>', mes)
+        parts = re.findall(r'<[^>]*>|\{[^}]*\}|[^<>{}]+', mes)
         result = []
         for part in parts:
             if part.startswith("<") and part.endswith(">"):
                 # <image>
                 key:str=part[1:-1]
-                if key =="image":
-                    result.append({
-                        "type": "image_url",
-                        "image_url": {"url": "{image_url}"},
-                    })
-                    continue
-                #query constistency?
                 content_=self.eval_critic_dict[key]
                 if type(content_)==list:
                     result.append({
@@ -130,6 +69,35 @@ class EvalTemplate(Runnable):
                         "type": "text",
                         "text": content_
                     })
+            elif part.startswith("{") and part.endswith("}"):
+                key=part[1:-1]
+                # {image}
+                if key.startswith("image"):
+                    result.append({
+                        "type": "image_url",
+                        "image_url": {"url": "{"+key+"}"},
+                    })
+                elif key=='query':
+                    for mes in query:
+                        result.append({
+                            "type": "text",
+                            "text": f'\n###{mes['role']}:\n'
+                        })
+                        for con in mes['content']:
+                            if con['type']=='text':
+                                result.append({
+                                    "type": "text",
+                                    "text": con['text']
+                                })
+                            elif con['type']=='image':
+                                result.append({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": con['image_url']['url']
+                                    }
+                                })
+                            
+            
             else:
                 result.append({
                     "type": "text",
@@ -144,28 +112,19 @@ class EvalProcess:
     def __init__(self, judge_llm: ChatOpenAI,critic_dir: str = "src/eval/critic2/vision"):
         self.judge_llm = judge_llm
         critic_path=Path(critic_dir)
-        # self.eval_dimensions:dict[str,EvalImgTemplate]={}
-        # for c in critic_path.glob("*.json"):
-        #     with open(c, "r", encoding="utf-8") as f:
-        #         critic = json.load(f)
-        #     self.eval_dimensions[c.stem] = EvalImgTemplate(
-        #         "\n".join(critic["critic"]),
-        #         critic["case_input_path"],
-        #         critic["case_output"],
-        #     )
         self.eval_dimensions:dict[str,EvalTemplate]={}
         for c in critic_path.glob("*.json"):
             with open(c, "r", encoding="utf-8") as f:
                 critic_dict = json.load(f)
             self.eval_dimensions[c.stem] = EvalTemplate(critic_dict)                                                 
 
-def get_json(text: str)->json:
-    st=text.find("{")
-    end=text.rfind("}")
-    if st == -1 or end == -1:
-        print("No JSON found in the text.\n",text)
-        return None
-    return json.loads(text[st:end + 1])
+# def get_json(text: str)->json:
+#     st=text.find("{")
+#     end=text.rfind("}")
+#     if st == -1 or end == -1:
+#         print("No JSON found in the text.\n",text)
+#         return None
+#     return json.loads(text[st:end + 1])
 
 if __name__ == "__main__":
     
@@ -189,7 +148,7 @@ if __name__ == "__main__":
         annotathon_={}
         for _,v in ep.eval_dimensions.items():
             ans= judge_llm.invoke(v.invoke(image_path)).content
-            ans=get_json(ans) 
+            ans=extract_block(ans)
             for k,v in ans.items():
                 if k!='reason':
                     annotathon_[k]=v

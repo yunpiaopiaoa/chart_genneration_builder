@@ -60,16 +60,19 @@ def main(sample_dir: str, infer_dir: str):
                 task_results.append(ts)
                 task_name=ts["task"]
                 if task_name.endswith("2code"):
-                    code=extract_block(ts["prediction"])
-                    chart_img_gen.generate_img(code, infer_dir_path / str(index) / f"{task_name}.png")
+                    try:
+                        code=extract_block(ts["prediction"])
+                        chart_img_gen.generate_img(code, infer_dir_path / str(index) / f"{task_name}.png")
+                    except Exception as e:
+                        print(f"{task_name}任务下图片渲染失败,其样本图片为{eval_sample.img_path}")
             result = InferResult(
                 chart_data=eval_sample.chart_data,
-                img_path=eval_sample.img_path,
+                code=eval_sample.code,
+                image=eval_sample.img_path,
                 task_results=task_results,
             )
             with (infer_dir_path / str(index) /"infer_result.json").open("w", encoding="utf-8") as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
-            # break  # WARNING:测试时使用
     chart_img_gen.cleanup()
 
 

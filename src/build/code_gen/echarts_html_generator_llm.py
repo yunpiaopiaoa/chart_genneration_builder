@@ -5,19 +5,19 @@ import textwrap
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
+from src.build.code_gen.html_template import HtmlTemplate
 from src.datamodel.annotation import ChartData
 from src.datamodel.annotation import CodeData
 from src.build.code_gen.base_code_generator import BaseCodeGenerator
 
 class EchartsHtmlGeneratorLLM(BaseCodeGenerator):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.ERROR)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     def __init__(self, model:ChatOpenAI):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-
         self.case_str=""
         curdir = Path(__file__).parent
         script_path = curdir / "script_example.js"
@@ -41,16 +41,13 @@ class EchartsHtmlGeneratorLLM(BaseCodeGenerator):
             """
         prompt: PromptTemplate = PromptTemplate.from_template(textwrap.dedent(script_template))
         self.chain = prompt | model
-        self.html_template=""
-        with (curdir / "template.html").open("r", encoding="utf-8") as f:
-            self.html_template=f.read()
-        
+        self.html_template=HtmlTemplate()        
 
     def generate_code(self, chart_data: ChartData) -> CodeData:
         try:
             outputs = self.chain.invoke({"case_str":self.case_str,"chartdata": chart_data})
             script="\n".join(" "*8 + line for line in outputs.content.splitlines())
-            code=self.html_template.format(script=script)
+            code=self.html_template.instance(script)
             compressed_html_code = re.sub(r"\s*\n\s*", "", code)
             codedata=CodeData(language="echarts",code=compressed_html_code)
             return codedata

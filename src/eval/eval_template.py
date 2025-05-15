@@ -10,7 +10,6 @@ from PIL import Image
 
 from src.datamodel.annotation import encode_base64
 
-
 class EvalImgTemplate(Runnable):
     def __init__(self, critic: str, case_input_path: str, case_output: dict):
         self.template = ChatPromptTemplate.from_messages(
