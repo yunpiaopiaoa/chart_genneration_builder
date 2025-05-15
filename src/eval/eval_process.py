@@ -51,7 +51,7 @@ class EvalProcess:
                     )
                 elif task_name.endswith("data"):  # img2data,code2data,text2data
                     data_block = extract_block(task_result["prediction"])
-                    ##WARNING:如果为字典列表，而不是key:[value]格式，需要转换格式
+                    #WARNING:如果为字典列表，而不是key:[value]格式，需要转换格式
                     try:
                         pred_dict = json.loads(data_block)
                         if isinstance(pred_dict, list):
@@ -73,6 +73,7 @@ class EvalProcess:
                         task_result,
                         infer_result["chart_data"]["data"],
                         infer_result["img_path"],
+                        infer_result["code"]["code"]
                     )
                 else:
                     raise ValueError(f"Unsupported task: {task_name}")
@@ -82,13 +83,13 @@ class EvalProcess:
         return eval_results
 
     def eval_qa(
-        self, task_result: TaskResult, chart_data: dict[str, list], img_path: str
+        self, task_result: TaskResult, chart_data: dict[str, list], img_path: str,code:str
     ):
         """评估qa问答与原图表的相关性"""
         prompt_value = self.eval_templates.qa_template().invoke(
             {
                 "chart_data": chart_data,
-                "code": "?",  # WARNING:这里需要外部传入code参数
+                "code": code,
                 "img_path": img_path,
                 "query": task_result["question"][-1],  ##WARNING:严重的耦合
                 ##task_result["question"]是待评估模型需要回答的query，包含图表数据，代码和图片,用户询问

@@ -10,16 +10,14 @@ from .base_data_generator import BaseDataGenerator
 
 
 class LLMDataGenerator(BaseDataGenerator):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.ERROR)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     def __init__(self,model:ChatOpenAI):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-
         case = {
-            # "topic": "全球气候变化", # topic：图表所涉及的主题或话题；
             "type": "折线图",
             "title": "近30年全球平均温度变化",
             "data": {

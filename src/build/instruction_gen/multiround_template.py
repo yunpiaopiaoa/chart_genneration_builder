@@ -9,22 +9,29 @@ from langchain_core.messages import BaseMessage
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from src.build.instruction_gen.base_template import BaseInstructionTemplate
+from src.build.instruction_gen.data2code_template import Data2CodeTemplate
+from src.build.instruction_gen.img2code_template import Img2CodeTemplate
+from src.build.instruction_gen.text2code_template import Text2CodeTemplate
 from src.datamodel.annotation import ChartData, CodeData, InstructionData, Message
 from src.utils.extract import extract_block
 
 
 class MultiRoundTemplate(BaseInstructionTemplate):
     task = "multi_round"
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.ERROR)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
     def __init__(self, language: str, model: ChatOpenAI):
         super().__init__(language)
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.ERROR)
-        handler = logging.FileHandler(f"log/{__class__.__name__}.log")
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
         self.model = model
+        self.img2code=Img2CodeTemplate()
+        self.data2code=Data2CodeTemplate()
+        self.text2code=Text2CodeTemplate()
+        
 
     def get_instance(self, chart_data: ChartData, code_data: CodeData):
         history: list[BaseMessage] = []
@@ -46,11 +53,12 @@ class MultiRoundTemplate(BaseInstructionTemplate):
         ins = InstructionData(task=self.task, messages=messages)
         return ins
 
+    #TODO:修改模板使得大模型能够提出输入图片
     def generate_init_question(self, chart_data: ChartData, code_data: CodeData):
         """生成初始问题"""
         question = PromptTemplate.from_template(
             """
-        请你生成一个有关echarts图表的生成需求。我将为你提供一些图表的参考信息。
+        请你生成一个有关{language}图表的生成需求。我将为你提供一些图表的参考信息。
         要求：
         1. 不需要完全参考图表信息；
         2. 需求描述尽量简洁明了，契合人类用户的语气口吻,避免使用过多的修饰词、礼貌用词和复杂句式；
@@ -63,6 +71,7 @@ class MultiRoundTemplate(BaseInstructionTemplate):
         )
         promt_value = question.invoke(
             {
+                "language":code_data["language"],
                 "code": code_data["code"],
                 "chart_data": json.dumps(chart_data["data"]),
                 "title": chart_data["title"],
@@ -70,6 +79,9 @@ class MultiRoundTemplate(BaseInstructionTemplate):
             }
         )
         response = self.model.invoke(promt_value)
+
+        # ins=self.text2code.get_instance(chart_data, code_data)
+        # ins["messages"][-1]["content"]
         return response.content
 
     def generate_question(
@@ -89,6 +101,16 @@ class MultiRoundTemplate(BaseInstructionTemplate):
         1. 基于前文提到的修改需求,保持问题自然连贯；
         2. 沉浸代入用户视角，模仿用户的口吻，提出的问题尽可能简洁清晰；
         3. 提出的图表需求描述没有必要使用礼貌用词，而是应该尽可能接近真实人类的语言风格，避免使用过多的修饰词和复杂的句式。 
+        4. 图表编辑的需求限定在如下范围：增加、删除、修改
+            - 标题内容
+            - 图例内容和位置
+            - 单项数据+多项任务
+            - 图形颜色
+            - 坐标轴范围和名称
+            - 数据显示tips
+            - 字体类别和大小
+            - 图形尺寸
+            - 图表类型或者布局
         """
         )
         prompt_value = prompt.format(sys=sys_setting, history=history)

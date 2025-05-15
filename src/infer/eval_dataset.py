@@ -13,6 +13,9 @@ class EvalSample:
         self._img_path = img_path
 
     @property
+    def code(self):
+        return self.annotation["code"]
+    @property
     def chart_data(self):
         return self.annotation["chart"]
 
@@ -59,11 +62,18 @@ class EvalDataset:
         for dir in self.path.iterdir():
             if not dir.is_dir():
                 continue
-            json_path = dir / "annotation.json"
-            img_path = dir / "chart.png"
-            with json_path.open("r", encoding="utf-8") as f:
-                annotation_data: Annotation = json.load(f)
-            yield EvalSample(annotation_data, str(img_path))
+            for sub_dir in dir.iterdir():
+                json_path = sub_dir / "annotation.json"
+                img_path = sub_dir / "chart.png"
+                with json_path.open("r", encoding="utf-8") as f:
+                    annotation_data: Annotation = json.load(f)
+                yield EvalSample(annotation_data, str(img_path))
 
     def __len__(self):
-        return sum(1 for dir in self.path.iterdir() if dir.is_dir())
+        cnt=0
+        for dir in self.path.iterdir():
+            if not dir.is_dir():
+                continue
+            for sub_dir in dir.iterdir():
+                cnt+=1
+        return cnt

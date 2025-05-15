@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import e
+from threading import Thread
 from typing import Literal
 
 from langchain_openai import ChatOpenAI
@@ -18,27 +20,54 @@ from src.build.instruction_gen.text2data_template import Text2DataTemplate
 from .base_template import BaseInstructionTemplate
 
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import weakref
+
 class InstructionGen:
-    def __init__(self,llm:ChatOpenAI,language:Literal["zh","en"]):
+    def __init__(self, llm: ChatOpenAI, language: Literal["zh", "en"]):
         self.templates: list[BaseInstructionTemplate] = [
-            # Img2TypeTemplate(language),
             Img2CodeTemplate(language),
             Img2DataTemplate(language),
-            # Img2TextTemplate(language),
-            # Data2TypeTemplate(language),
             Data2CodeTemplate(language),
-            # Code2DataTemplate(language),
-            Text2CodeTemplate(language,llm),
-            # Text2DataTemplate(language),
-            QATemplate(language, llm)
-    ]
+            Text2CodeTemplate(language, llm),
+            QATemplate(language, llm),
+        ]
+        # 初始化线程池（建议4-8个worker）
+        self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="InstGen_")
+        
+        # 使用弱引用finalizer确保资源释放
+        self._finalizer = weakref.finalize(
+            self, 
+            self._cleanup_executor,
+            self.executor
+        )
+
+    def _cleanup_executor(self, executor):
+        """安全关闭线程池"""
+        executor.shutdown(wait=False)
+        print("ThreadPoolExecutor 已释放")
 
     def generate_instruction(self, chart_data: ChartData, code_data: CodeData):
         instructions: list[InstructionData] = []
-        for template in self.templates:
-            try:#使用大模型构造指令可能失败
-                instruction_data = template.get_instance(chart_data, code_data)
-                instructions.append(instruction_data)
+        futures = {
+            self.executor.submit(template.get_instance, chart_data, code_data): template
+            for template in self.templates
+        }
+
+        for future in as_completed(futures):
+            try:
+                instructions.append(future.result())
             except Exception as e:
-                print(f"generate instruction error occur at {template.task} template:{e}")
+                template = futures[future]
+                print(f"Error in {template.task}: {str(e)}")
+        
         return instructions
+
+    def close(self):
+        """显式关闭方法"""
+        if hasattr(self, '_finalizer') and self._finalizer.detach():
+            self._cleanup_executor(self.executor)
+
+    def __del__(self):
+        """析构函数备用"""
+        self.close()

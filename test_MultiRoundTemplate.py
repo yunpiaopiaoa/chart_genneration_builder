@@ -19,8 +19,8 @@ if __name__ == "__main__":
         model=con["build_llm"]["model"],
         api_key=con["build_llm"]["api_key"],
     )
-    template = MultiRoundTemplate("echarts", llm)
-    sample_path=Path("sample/sample27/1")
+    template = MultiRoundTemplate("zh", llm)
+    sample_path=Path("sample/sample26/1")
     with open(sample_path/"annotation.json", "r", encoding="utf-8") as f:
         anno:Annotation=json.load(f)
         chart_data=anno["chart"]

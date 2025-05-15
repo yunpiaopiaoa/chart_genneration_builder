@@ -21,9 +21,7 @@ class ChartxDataGenerator(BaseDataGenerator):
         return self.random_select()
 
     def random_select(self) -> ChartData:
-        """随机选择一个文件
-        WARNING
-        """
+        """随机选择一个文件"""
         select_dir = random.choice([d for d in self.data_dir.iterdir() if d.is_dir()])
         select_type = select_dir.stem
         csv_dir = select_dir / "csv"
