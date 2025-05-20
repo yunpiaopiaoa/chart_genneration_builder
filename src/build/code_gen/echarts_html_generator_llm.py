@@ -49,7 +49,7 @@ class EchartsHtmlGeneratorLLM(BaseCodeGenerator):
             script="\n".join(" "*8 + line for line in outputs.content.splitlines())
             code=self.html_template.instance(script)
             compressed_html_code = re.sub(r"\s*\n\s*", "", code)
-            codedata=CodeData(language="echarts",code=compressed_html_code)
+            codedata=CodeData(language="echarts HTML",code=compressed_html_code)
             return codedata
         except Exception as e:
             self.logger.error(f"Generate html code failed:{e}")

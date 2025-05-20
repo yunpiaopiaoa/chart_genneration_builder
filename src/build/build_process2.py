@@ -96,7 +96,7 @@ type：图表类型。图表类型与示例代码的图表类型一致，必须�
                     executor.submit(
                         (target_dir / "index.html").write_text, code, encoding="utf-8"
                     )
-                    code_data = CodeData(language="echarts", code=code)
+                    code_data = CodeData(language="echarts HTML", code=code)
                     chart_data: ChartData = ChartData(
                         title=title, description=description, type=chart_type, data=data
                     )

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import re
 
@@ -20,6 +21,12 @@ template = """
 
 
 class HtmlTemplate:
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     def __init__(self):
         self.html_template = template
         self.pattern = re.compile(r'getElementById\((["\'])(.*?)\1\)')
@@ -27,7 +34,8 @@ class HtmlTemplate:
     def instance(self, script:str):
         match = re.search(self.pattern, script)
         if match is None:#没有调用getElementById函数，可能只有js配置，或者误传入pycharts代码
-            print(script)
+            self.logger.info(f"No getElementById function found in the script.\n{script}")
+            return script
         id = match.group(2)
         html_template = self.html_template.replace('<div id="chart"', f'<div id="{id}"')
         script="\n".join(" "*8 + line.strip() for line in script.splitlines())

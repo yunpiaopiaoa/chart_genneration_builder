@@ -1,5 +1,7 @@
 # from playwright.async_api import async_playwright
+import html
 from http.server import SimpleHTTPRequestHandler
+import logging
 import os
 from pathlib import Path
 import re
@@ -24,7 +26,12 @@ class MyServer(socketserver.TCPServer):
 
 class EchartsImgGenerator(BaseImgGenerator):
     """只使用同步"""
-    
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     
     def __init__(self):
         self.playwright = sync_playwright().start()
@@ -58,15 +65,22 @@ class EchartsImgGenerator(BaseImgGenerator):
 
     def generate_img(self, code: str, save_path: str):
         """借助无头浏览器渲染 ECharts 图表并保存为图片"""
-        if not re.search(r"<html>", code):
+        if not re.search(r"html", code):
             # 如果不存在html标签，说明是js代码，需要使用模板包裹起来
             code = self.html_template.instance(code)
+        code = html.unescape(code)# 还原转义字符
         page = self.browser.new_page(viewport={"width": 1920, "height": 1080})
+        # content = re.sub(
+        #     r'src="[^"]*"',
+        #     f'src="http://localhost:{self.port}/lib/echarts.min.js"',
+        #     code,
+        # )
         content = re.sub(
-            r'src="[^"]*"',
-            f'src="http://localhost:{self.port}/lib/echarts.min.js"',
+            r'src=(["\'])([^"\']*)\1',
+            f'src=\\1http://localhost:{self.port}/lib/echarts.min.js\\1',
             code,
         )
+        # self.logger.info(content)
         page.set_content(content, wait_until="load")
         pattern = r'getElementById\((["\'])(.*?)\1\)'
         match = re.search(pattern, code)

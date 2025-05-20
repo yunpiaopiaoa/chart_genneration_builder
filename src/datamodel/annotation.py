@@ -21,7 +21,7 @@ class ChartData(TypedDict):
 class CodeData(TypedDict):
     """代码数据"""
 
-    language: Literal["echarts,python"]
+    language: Literal["echarts HTML","python"]
     code: str
 
 
