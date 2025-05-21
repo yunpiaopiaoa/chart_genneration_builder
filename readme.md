@@ -45,37 +45,6 @@ conda env create -f environment.yml
 
 对于build_llm，eval_llm,judge_llm，填写具体的模型访问参数;
 
-(如果使用ChartxDataGenerator作为图表数据生成器)
-对于chartx_config，需要下载chartx数据集，填写chartx数据集路径;
-
-chartx数据集目录结构如下:
-```
-.
-├── 3D-Bar
-│   ├── code
-│   ├── csv
-│   ├── png
-│   └── txt
-├── area_chart
-├── bar_chart
-├── bar_chart_num
-├── box
-├── bubble
-├── candlestick
-├── treemap
-├── funnel
-├── heatmap
-├── histogram
-├── line_chart
-├── line_chart_num
-├── multi-axes
-├── pie_chart
-├── radar
-├── rings
-├── rose
-├── ChartX_annotation.json
-└── ChartX.zip
-```
 3. 下载echarts.min.js到lib目录下
 ```
 wget -P lib https://cdn.bootcss.com/echarts/4.9.0/echarts.min.js 
@@ -111,12 +80,11 @@ python eval.py --infer_dir=results_infer --eval_dir=results_eval
 |   └── config.ini          # 配置文件
 ├── lib/                    # 第三方库，如存放echarts.min.js
 ├── src/
-│   ├── builld/
-|   |   └── generator/          
-|   |        ├── code_gen    # 代码生成器
-|   |        ├── data_gen    # 图表数据生成器
-|   |        ├── img_gen     # 图片生成器
-|   |        └── instruction_gen # 指令生成器 
+│   ├── builld/        
+|   |   ├── code_gen    # 代码生成器
+|   |   ├── data_gen    # 图表数据生成器
+|   |   ├── img_gen     # 图片生成器
+|   |   └── instruction_gen # 指令生成器 
 │   ├── datamodel/          # 数据模型定义
 |   |   ├── annotation.py   # 样本数据定义（包含图表数据、代码对象、指令数据）
 |   |   ├── infer_result.py # 推理结果定义
