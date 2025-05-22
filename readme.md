@@ -60,7 +60,7 @@ python build.py --sample_dir=sample --gen_count=2
 5. 执行推理任务
 需配置eval_llm参数
 ```
-python infer.py --sample_dir=sample --infer_dir=results_infer
+python infer_multithread3.py --sample_dir=sample --infer_dir=results_infer
 ```
 其中sample_dir是图表数据样本目录，应与build.py的sample_dir参数一致
 
@@ -69,7 +69,7 @@ infer_dir是推理结果的目录
 6. 评估推理结果
 需配置judge_llm参数
 ```
-python eval.py --infer_dir=results_infer --eval_dir=results_eval
+python eval_with_pandas.py --infer_dir=results_infer --eval_dir=results_eval
 ```
 其中infer_dir是推理结果目录，应与infer.py的infer_dir参数一致
 评测过程对于代码评测任务，代码渲染图片将保存至tmp/img目录下
