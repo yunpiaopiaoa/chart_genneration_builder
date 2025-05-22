@@ -72,6 +72,7 @@ def process_sample(
     img_executor:ThreadPoolExecutor,
     chart_img_gen: EchartsImgGeneratorMultiThread,
     save_path: Path,
+    task_set:set[str]
 ):
     # print(f"Processing sample", save_path)
     futures = []
@@ -82,6 +83,8 @@ def process_sample(
         eval_messages,
         ground_truth,
     ) in eval_sample.generate_task():
+        if task_name not in task_set:
+            continue
         future = executor.submit(
             process_task,
             eval_llm,
@@ -107,7 +110,7 @@ def process_sample(
     return result
 
 
-def main(sample_dir: str, infer_dir: str):
+def main(sample_dir: str, infer_dir: str,tasks:list[str]):
     cur_dir = Path(__file__).resolve().parent
     config_path = cur_dir / "config" / "config.ini"
     con = configparser.ConfigParser()
@@ -119,6 +122,7 @@ def main(sample_dir: str, infer_dir: str):
         api_key=config["api_key"],
     )
     # 定义待评测模型,加载评测集
+    task_set=set(tasks)
     eval_llm = EvalGpt(llm)
     eval_set = EvalDataset(cur_dir / sample_dir)
     chart_img_gen = EchartsImgGeneratorMultiThread()
@@ -131,9 +135,9 @@ def main(sample_dir: str, infer_dir: str):
                 futures = []
                 for index, eval_sample in enumerate(eval_set):
                     save_path = infer_dir_path / str(index)
+                    save_path.mkdir(exist_ok=True)
                     if sum(f.is_file() for f in save_path.iterdir())==4:
                         continue
-                    save_path.mkdir(exist_ok=True)
                     futures.append(
                         outter_excutor.submit(
                             process_sample,
@@ -143,6 +147,7 @@ def main(sample_dir: str, infer_dir: str):
                             img_excutor,
                             chart_img_gen,
                             save_path,
+                            task_set
                         )
                     )
                 for future in tqdm(
@@ -157,6 +162,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="生成推理答案文件")
     parser.add_argument("--sample_dir", type=str, help="评测集样本目录")
     parser.add_argument("--infer_dir", type=str, help="推理结果输出目录")
+    parser.add_argument("--tasks",nargs='+', help="推理任务列表")
     args = parser.parse_args()
 
-    main(args.sample_dir, args.infer_dir)
+    main(args.sample_dir, args.infer_dir,args.tasks)
