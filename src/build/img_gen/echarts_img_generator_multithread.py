@@ -36,6 +36,7 @@ class EchartsImgGeneratorMultiThread(BaseImgGenerator):
 
     def __init__(self):
         self.port = 8000
+        self.delay=1000#毫秒
         def check_port_in_use(port):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 return s.connect_ex(('localhost', port)) == 0
@@ -72,7 +73,7 @@ class EchartsImgGeneratorMultiThread(BaseImgGenerator):
         match = re.search(pattern, code)
         id = match.group(2)
         page.wait_for_selector(f"#{id}", state="visible")
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(self.delay)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         element = page.query_selector(f"id={id}")
         element.screenshot(path=save_path)

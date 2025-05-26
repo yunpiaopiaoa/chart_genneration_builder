@@ -5,7 +5,7 @@ import re
 #     pattern = r'```(?:[a-zA-Z0-9_+-]*\n)?(.*?)```'
 #     match = re.search(pattern, text, re.DOTALL)
 #     return match.group(1).strip() if match else text
-def extract_block(text, tag: str | None = None):
+def extract_block(text:str, tag: str | None = None):
     pattern = r'```(\w+)\n(.*?)\n```'
     matches = re.findall(pattern, text, re.DOTALL)
     

@@ -15,7 +15,7 @@
 + img2type (图片到类型)
 + text2code (文本到代码)
 + text2data (文本到数据)
-+ 问答任务(QA)
++ 问答任务(qa)
 
 每一类任务下有若干个评测指标。
 + x2data类型：
@@ -60,9 +60,9 @@ python build.py --sample_dir=sample --gen_count=2
 5. 执行推理任务
 需配置eval_llm参数
 ```
-python infer_multithread3.py --sample_dir=sample --infer_dir=results_infer
+python infer_multithread3.py --sample_dir=sample --infer_dir=results_infer --tasks data2code text2code 
 ```
-其中sample_dir是图表数据样本目录，应与build.py的sample_dir参数一致
+其中sample_dir是图表数据样本目录，应与build.py的sample_dir参数一致,tasks取自上面评测的任务的英文列表中。注意根据推理模型所支持模态进行选择。如果不限定tasks，则默认对所有评估任务进行推理。
 
 infer_dir是推理结果的目录
 

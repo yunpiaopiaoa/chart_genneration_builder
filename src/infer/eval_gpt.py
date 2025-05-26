@@ -1,5 +1,6 @@
 import base64
 from io import BytesIO
+import logging
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage
 
@@ -8,6 +9,12 @@ from src.infer.toeval_llm import BaseToEvalLLM
 
 
 class EvalGpt(BaseToEvalLLM):
+    # logger = logging.getLogger(__name__)
+    # logger.setLevel(logging.INFO)
+    # handler = logging.FileHandler(f"log/{__name__}.log")
+    # formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # handler.setFormatter(formatter)
+    # logger.addHandler(handler)
     def __init__(self, model: ChatOpenAI):
         super().__init__()
         self.model = model
@@ -37,5 +44,6 @@ class EvalGpt(BaseToEvalLLM):
                 input.append(dic)
             else:
                 raise ValueError(f"Unsupported content type {type(message['content'])}")
+        # self.logger.info(str(messages))
         response = self.model.invoke(input)
         return response.content

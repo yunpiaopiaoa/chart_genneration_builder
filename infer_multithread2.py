@@ -38,17 +38,17 @@ def process_task(
     messages,
     eval_messages,
     ground_truth,
-    img_executor: ThreadPoolExecutor,
+    executor: ThreadPoolExecutor,
     chart_img_gen: EchartsImgGeneratorMultiThread,
     save_path: Path,
 ):
-    # print("processing task", task_name, save_path)
+    print("processing task", task_name, save_path)
     prediction = eval_llm.answer(eval_messages)
     if task_name.endswith("2code"):
         try:
             # code = extract_block(ts["prediction"])
             code = extract_block(prediction, "html")
-            img_executor.submit(
+            executor.submit(
                 chart_img_gen.generate_img,
                 code,
                 save_path / f"{task_name}.png",
@@ -69,12 +69,10 @@ def process_sample(
     eval_llm: BaseToEvalLLM,
     eval_sample: EvalSample,
     executor: ThreadPoolExecutor,
-    img_executor:ThreadPoolExecutor,
     chart_img_gen: EchartsImgGeneratorMultiThread,
     save_path: Path,
-    task_set:set[str]
 ):
-    # print(f"Processing sample", save_path)
+    print(f"Processing sample", save_path)
     futures = []
     task_results = []
     for (
@@ -83,8 +81,7 @@ def process_sample(
         eval_messages,
         ground_truth,
     ) in eval_sample.generate_task():
-        if task_set and task_name not in task_set:
-            continue
+        print("submit task", task_name, save_path)
         future = executor.submit(
             process_task,
             eval_llm,
@@ -92,7 +89,7 @@ def process_sample(
             messages,
             eval_messages,
             ground_truth,
-            img_executor,
+            executor,
             chart_img_gen,
             save_path,
         )
@@ -110,7 +107,7 @@ def process_sample(
     return result
 
 
-def main(sample_dir: str, infer_dir: str,tasks:list[str]):
+def main(sample_dir: str, infer_dir: str):
     cur_dir = Path(__file__).resolve().parent
     config_path = cur_dir / "config" / "config.ini"
     con = configparser.ConfigParser()
@@ -122,41 +119,35 @@ def main(sample_dir: str, infer_dir: str,tasks:list[str]):
         api_key=config["api_key"],
     )
     # 定义待评测模型,加载评测集
-    task_set=set(tasks) if tasks else set()
     eval_llm = EvalGpt(llm)
     eval_set = EvalDataset(cur_dir / sample_dir)
     chart_img_gen = EchartsImgGeneratorMultiThread()
     infer_dir_path = cur_dir / infer_dir
     infer_dir_path.mkdir(parents=True, exist_ok=True)
 
-    with ThreadPoolExecutor(max_workers=2) as outter_excutor:
-        with ThreadPoolExecutor(max_workers=8) as inner_excutor:
-            with ThreadPoolExecutor(max_workers=8) as img_excutor:
-                futures = []
-                for index, eval_sample in enumerate(eval_set):
-                    save_path = infer_dir_path / str(index)
-                    save_path.mkdir(exist_ok=True)
-                    if sum(f.is_file() for f in save_path.iterdir())==4:
-                        continue
-                    futures.append(
-                        outter_excutor.submit(
-                            process_sample,
-                            eval_llm,
-                            eval_sample,
-                            inner_excutor,
-                            img_excutor,
-                            chart_img_gen,
-                            save_path,
-                            task_set
-                        )
+    with ThreadPoolExecutor(max_workers=4) as outter_executor:
+        with ThreadPoolExecutor(max_workers=4) as inner_executor:
+            futures = []
+            for index, eval_sample in enumerate(eval_set):
+                save_path = infer_dir_path / str(index)
+                if save_path.exists():
+                    continue
+                save_path.mkdir(exist_ok=True)
+                futures.append(
+                    outter_executor.submit(
+                        process_sample,
+                        eval_llm,
+                        eval_sample,
+                        inner_executor,
+                        chart_img_gen,
+                        save_path,
                     )
-                for future in tqdm(
-                    as_completed(futures), total=len(futures), desc="Processing samples"
-                ):
-                    future.result()
-            #     img_excutor.shutdown(wait=True)
-            # inner_excutor.shutdown(wait=True)
-        outter_excutor.shutdown(wait=True)
+                )
+            for future in tqdm(
+                as_completed(futures), total=len(futures), desc="Processing samples"
+            ):
+                future.result()
+        outter_executor.shutdown(wait=True)
     chart_img_gen.cleanup()
 
 
@@ -164,7 +155,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="生成推理答案文件")
     parser.add_argument("--sample_dir", type=str, help="评测集样本目录")
     parser.add_argument("--infer_dir", type=str, help="推理结果输出目录")
-    parser.add_argument("--tasks",nargs='+', help="推理任务列表")
     args = parser.parse_args()
 
-    main(args.sample_dir, args.infer_dir,args.tasks)
+    main(args.sample_dir, args.infer_dir)
