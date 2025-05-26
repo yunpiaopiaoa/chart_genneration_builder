@@ -34,10 +34,12 @@ if __name__ == "__main__":
     parser.add_argument("--sample_dir", type=str, help="评测集样本目录")
     parser.add_argument("--infer_dir", type=str, help="推理结果输出目录")
     parser.add_argument("--tasks", nargs="+", help="推理任务列表")
+    parser.add_argument("--workers",default=8, type=int, help="工作线程数")
     args = parser.parse_args()
     sample_dir = args.sample_dir
     infer_dir: str = args.infer_dir
     tasks = args.tasks
+    workers = args.workers
 
     cur_dir = Path(__file__).resolve().parent
     config_path = cur_dir / "config" / "config.ini"
@@ -62,8 +64,8 @@ if __name__ == "__main__":
     pending_tasks = 0
     task_done_event = threading.Event()
 
-    with ThreadPoolExecutor(max_workers=8) as img_executor, ThreadPoolExecutor(
-        max_workers=8
+    with ThreadPoolExecutor(max_workers=workers) as img_executor, ThreadPoolExecutor(
+        max_workers=workers
     ) as io_executor:
 
         def handle(future, save_path, task_name, messages, ground_truth):
