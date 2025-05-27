@@ -1,9 +1,11 @@
 from collections import defaultdict
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Iterable
 import json, re
+from venv import logger
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import Runnable, RunnableParallel
 from langchain_core.messages import BaseMessage
@@ -27,6 +29,11 @@ def replace_content(
         if part.startswith("<") and part.endswith(">"):
             # <image>
             key: str = part[1:-1]
+            if key not in replace_dict:
+                # print(mes)
+                result.append({"type": "text", "text": f"<{key}>"})
+                continue
+                # raise ValueError(f"Key {key} not found in replace_dict")
             content_ = replace_dict[key]
             if type(content_) == list and type(content_[0]) == str:
                 result.append({"type": "text", "text": "\n".join(content_)})
@@ -108,9 +115,14 @@ class EvalTemplate(Runnable):
 
 
 class EvalProcess:
-    def __init__(
-        self, judge_llm: ChatOpenAI, critic_dir: str
-    ):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(f"log/{__name__}.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    def __init__(self, judge_llm: ChatOpenAI, critic_dir: str):
         self.judge_llm = judge_llm
         critic_path = Path(critic_dir)
         self.eval_critcs: dict[str, str] = {}
@@ -123,7 +135,7 @@ class EvalProcess:
         # eval_results: dict[str, dict[str, list[float]]] = defaultdict(dict)
         infer_res_path = infer_results_dir.joinpath("infer_result.json")
         with open(infer_res_path, "r", encoding="utf-8") as f:
-            infer_results:InferResult = json.load(f)
+            infer_results: InferResult = json.load(f)
         eval_res = {}
         for task in tasks:
             task_eval_res = {}
@@ -131,15 +143,18 @@ class EvalProcess:
             if not image_path.exists():
                 continue
             infer_query = get_query_from_infer(infer_results, task)
-            for _, v in self.eval_critcs.items():
+            image_base_path = infer_results["image"]
+            for metric, v in self.eval_critcs.items():
                 eval_template = EvalTemplate(v, infer_query)
-                ans = self.judge_llm.invoke(
-                    eval_template.invoke(
-                        {
-                            "image": encode_base64(image_path),
-                        }
-                    )
-                ).content
+                input_value = eval_template.invoke(
+                    {
+                        "image": encode_base64(image_path),
+                        "image_base": encode_base64(image_base_path)
+                    },
+                )
+                self.logger.info(f"{infer_results_dir} {task} {metric}:{input_value}")
+                ans = self.judge_llm.invoke(input_value).content
+                self.logger.info(f"{infer_results_dir} {task} {metric}:{ans}")
                 ans = extract_block(ans)
                 ans = json.loads(ans)
                 for k, v in ans.items():

@@ -16,11 +16,7 @@ def main(gen_count: int, sample_dir: str):
     config_path = config_dir / "config.ini"
     con = configparser.ConfigParser()
     con.read(config_path, encoding="utf-8")
-    llm = ChatOpenAI(
-        base_url=con["build_llm"]["base_url"],
-        model=con["build_llm"]["model"],
-        api_key=con["build_llm"]["api_key"],
-    )
+    llm = ChatOpenAI(**con["build_llm"])
 
     # 定义生成器
     data_gen = ChartxDataGenerator(**dict(con["chartx_config"]))

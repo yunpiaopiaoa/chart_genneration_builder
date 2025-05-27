@@ -17,7 +17,7 @@
 + text2data (文本到数据)
 + 问答任务(qa)
 
-每一类任务下有若干个评测指标。
+每一类任务下有若干个评测指标，指标评分采用直接评分和对比评分两种方式。
 + x2data类型：
     - 评测推理所得图表数据与原始图表数据的相似性（通过字典相似度的规则算法）
 + x2code类型：
@@ -39,6 +39,11 @@
 ```
 conda env create -f environment.yml
 ```
+或者使用uv（推荐）
+```
+pip install uv
+uv pip install -r requirements.txt
+```
 2. 配置config/config.ini
 
 将config/config.ini.template更名为config/config.ini
@@ -49,9 +54,12 @@ conda env create -f environment.yml
 ```
 wget -P lib https://cdn.bootcss.com/echarts/4.9.0/echarts.min.js 
 ```
+在使用playwright渲染echarts图片时，将通过本地静态服务器请求这一文件。
 
 4. 生成图表数据
 需配置build_llm参数
+
+可以通过下载样本集，跳过这一步骤。
 ```
 python build.py --sample_dir=sample --gen_count=2
 ```
@@ -60,19 +68,20 @@ python build.py --sample_dir=sample --gen_count=2
 5. 执行推理任务
 需配置eval_llm参数
 ```
-python infer_multithread3.py --sample_dir=sample --infer_dir=results_infer --tasks data2code text2code 
+python infer.py --sample_dir=sample --infer_dir=results_infer --tasks data2code text2code 
 ```
-其中sample_dir是图表数据样本目录，应与build.py的sample_dir参数一致,tasks取自上面评测的任务的英文列表中。注意根据推理模型所支持模态进行选择。如果不限定tasks，则默认对所有评估任务进行推理。
+sample_dir是图表数据样本目录，应与build.py的sample_dir参数一致,tasks取自上面评测的任务的英文列表中。注意根据推理模型所支持模态进行选择。如果不限定tasks，则默认对所有评估任务进行推理。
 
-infer_dir是推理结果的目录
+infer_dir是推理结果的目录，同时对于x2code任务将一并将存放代码渲染图片
+
 
 6. 评估推理结果
 需配置judge_llm参数
 ```
-python eval_with_pandas.py --infer_dir=results_infer --eval_dir=results_eval
+python eval.py --infer_dir=results_infer --eval_dir=results_eval
 ```
 其中infer_dir是推理结果目录，应与infer.py的infer_dir参数一致
-评测过程对于代码评测任务，代码渲染图片将保存至tmp/img目录下
+eval_dir为评估结果目录，包含所有评测样本的评分结果与总体评估结果。
 ## 目录结构
 ```
 .
@@ -110,7 +119,7 @@ python eval_with_pandas.py --infer_dir=results_infer --eval_dir=results_eval
 + 渲染图表图片
 + 生成各种任务的指令数据
 
-生成流程:
+流程:
 
 1. 使用ChartxDataGenerator生成图表数据
 2. 使用EchartsHtmlGeneratorLLM生成ECharts代码
@@ -120,9 +129,12 @@ python eval_with_pandas.py --infer_dir=results_infer --eval_dir=results_eval
 ### 推理阶段
 功能:针对每个评测样本，待评估模型需面向多种图表相关任务给出推理结果。
 
+流程：TODO
 
 ### 评测阶段
+功能:TODO
 
+流程：TODO
 ## 扩展性
 系统设计具有良好的扩展性，可以轻松添加：
 + 新的生成器实现（图表样本、代码、图片生成）
@@ -136,8 +148,8 @@ python eval_with_pandas.py --infer_dir=results_infer --eval_dir=results_eval
     - 在EvalTemplateDict中读取评测标准json文件，并在EvalProcess类的init函数中构造可以执行invoke的链（多个评测标准的对话实例可以同时向大模型输入）
 
 
-### 注意事项
-build.py构造出来的指令中，会使用如下占位符：
+## 注意事项
+build阶段构造出来的指令中，会使用如下占位符：
 
 `<chart_data>`代表图表数据
 
