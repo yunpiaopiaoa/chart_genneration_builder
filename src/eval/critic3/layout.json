@@ -1,0 +1,34 @@
+{
+    "critic": [
+        "你是一位数据可视化设计师。请根据以下维度，比较待评测图表和标准图表的布局系统，并判断待评测图表是否优于标准图表（better、worse 或 same）。输出结果是 JSON 格式。",
+        "### 1.元素遮挡情况评价（Occlusion）",
+        "评价重点：评估图表中重要信息（如数据点、标签、图例、坐标轴刻度等）是否被其他元素遮挡，影响了信息的可读性。",
+       
+        "### 2.空间利用率与“呼吸感”评价（Space）",
+        "评价重点：评估图表区域是否被有效利用，是否存在过多无意义的空白或元素排布过于拥挤，以及整体视觉“呼吸感”是否良好。",
+        
+        "### 3.元素对齐规整性评价(Alignment)",
+        "评价重点：评估图表中各元素（标题、副标题、图例、坐标轴标签、数据标签、注释等）是否遵循清晰、一致的对齐规则（如左对齐、右对齐、居中对齐、基线对齐等），体现专业性和秩序感。",
+
+        "针对用户询问，你需要返回一个json格式的字典，其中occlusion代表遮挡情况对比，space代表空间利用率对比，align代表对齐规整性对比，reason代表评价理由。",
+        "Output format example:\n{\n    \"occlusion\": \"better\",\n    \"space\": \"worse\",\n    \"align\": \"same\",\n    \"reason\": \"\"\n}"
+    ],
+    "case_input_path": "test/chart.png",
+    "image_base":"src/eval/critic3/Temperature Change in the Coming Week.png",
+    "case_output": {
+        "space":3,
+        "align":3,
+        "information":4,
+        "reason":""
+    },
+    "messages":[
+        {
+            "role":"system",
+            "content":"<critic>"
+        },
+        {
+            "role":"user",
+            "content":"与{image_base}相比，{image}的布局在遮挡情况、空间利用率和对齐规整性上表现如何？"
+        }
+    ]
+}
