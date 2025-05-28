@@ -1,4 +1,5 @@
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import logging
 import os
@@ -130,15 +131,47 @@ class EvalProcess:
             with open(c, "r", encoding="utf-8") as f:
                 critic_dict = json.load(f)
             self.eval_critcs[c.stem] = critic_dict
+        self.pool=ThreadPoolExecutor(max_workers=8)
+
+    # def eval(self, infer_results_dir: Path, tasks: list[str]):
+    #     # eval_results: dict[str, dict[str, list[float]]] = defaultdict(dict)
+    #     infer_res_path = infer_results_dir.joinpath("infer_result.json")
+    #     with open(infer_res_path, "r", encoding="utf-8") as f:
+    #         infer_results: InferResult = json.load(f)
+    #     eval_res = {}
+    #     for task in tasks:
+    #         task_eval_res = {}
+    #         image_path = infer_results_dir.joinpath(task + ".png")
+    #         if not image_path.exists():
+    #             continue
+    #         infer_query = get_query_from_infer(infer_results, task)
+    #         image_base_path = infer_results["image"]
+    #         for metric, v in self.eval_critcs.items():
+    #             eval_template = EvalTemplate(v, infer_query)
+    #             input_value = eval_template.invoke(
+    #                 {
+    #                     "image": encode_base64(image_path),
+    #                     "image_base": encode_base64(image_base_path)
+    #                 },
+    #             )
+    #             self.logger.info(f"{infer_results_dir} {task} {metric}:{input_value}")
+    #             ans = self.judge_llm.invoke(input_value).content
+    #             self.logger.info(f"{infer_results_dir} {task} {metric}:{ans}")
+    #             ans = extract_block(ans)
+    #             ans = json.loads(ans)
+    #             for k, v in ans.items():
+    #                 if k != "reason":
+    #                     task_eval_res[k] = v
+    #         eval_res[task] = task_eval_res
+    #     return eval_res
 
     def eval(self, infer_results_dir: Path, tasks: list[str]):
         # eval_results: dict[str, dict[str, list[float]]] = defaultdict(dict)
         infer_res_path = infer_results_dir.joinpath("infer_result.json")
         with open(infer_res_path, "r", encoding="utf-8") as f:
             infer_results: InferResult = json.load(f)
-        eval_res = {}
+        future_dict={}
         for task in tasks:
-            task_eval_res = {}
             image_path = infer_results_dir.joinpath(task + ".png")
             if not image_path.exists():
                 continue
@@ -153,12 +186,19 @@ class EvalProcess:
                     },
                 )
                 self.logger.info(f"{infer_results_dir} {task} {metric}:{input_value}")
-                ans = self.judge_llm.invoke(input_value).content
-                self.logger.info(f"{infer_results_dir} {task} {metric}:{ans}")
-                ans = extract_block(ans)
-                ans = json.loads(ans)
-                for k, v in ans.items():
-                    if k != "reason":
-                        task_eval_res[k] = v
-            eval_res[task] = task_eval_res
+                future=self.pool.submit(self.judge_llm.invoke, input_value)
+                future_dict[(task,metric)]=future#多个任务多指标并发
+        eval_res = {}
+        for (task,metric),future in future_dict.items():
+            output:BaseMessage=future.result()
+            ans = output.content
+            self.logger.info(f"{infer_results_dir} {task} {metric}:{ans}")
+            ans = extract_block(ans)
+            ans = json.loads(ans)
+            for k, v in ans.items():
+                if k != "reason":
+                    eval_res.setdefault(task,{})[k]=v
         return eval_res
+
+    def __del__(self):
+        self.pool.shutdown()

@@ -4,6 +4,7 @@ import configparser
 import json
 from pathlib import Path
 from langchain_openai import ChatOpenAI
+from tqdm import tqdm
 from src.eval.evaluation import EvalProcess
 import pandas as pd
 
@@ -21,14 +22,17 @@ def main(infer_dir: str, eval_dir: str):
     critic_dir = "src/eval/critic3"
     eval_process = EvalProcess(judge_llm, critic_dir=critic_dir)
     tasks = ["img2code","data2code","text2code"]
+    infer_result_dirs=list(Path(infer_dir).iterdir())
+    progress_bar = tqdm(total=len(infer_result_dirs), desc="评估任务")
     def handle(dir: Path):
         dic = eval_process.eval(dir, tasks)
         with (Path(eval_dir) / f"{dir.name}.json").open("w", encoding="utf-8") as f:
             json.dump(dic, f, ensure_ascii=False, indent=4)
+        progress_bar.update()
         return dic
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        eval_res_list = list(executor.map(handle, Path(infer_dir).iterdir()))
+        eval_res_list = list(executor.map(handle, infer_result_dirs))
 
     # 将结果转换为 DataFrame
     score_dic = {"better": 1, "same": 0.5, "worse": 0}
