@@ -27,7 +27,7 @@ class Img2TypeTemplate(BaseInstructionTemplate):
             },
         }
 
-    def get_instance(self, chart_data: ChartData, code_data: CodeData):
+    def get_instance(self, chart_data: ChartData, code_data: CodeData,img_path:str):
         query_template = random.choice(self.templates[self.language]["query"])
         query = query_template
         query+=self.templates[self.language]["constrain"]

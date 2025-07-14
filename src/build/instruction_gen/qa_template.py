@@ -80,7 +80,7 @@ class QATemplate(BaseInstructionTemplate):
             raise ValueError(f"Unsupported language: {language}")
         return messages
 
-    def get_instance(self, chart_data: ChartData, code_data: CodeData):
+    def get_instance(self, chart_data: ChartData, code_data: CodeData,img_path:str):
         inputs = {
             "chart_data": chart_data,
             "code": code_data["code"],
@@ -102,3 +102,4 @@ class QATemplate(BaseInstructionTemplate):
             self.logger.error(
                 f"Failed to parse JSON from output content: {outputs.content}"
             )
+            raise e

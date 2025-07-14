@@ -10,6 +10,6 @@ class BaseInstructionTemplate:
         self.language = language
 
     def get_instance(
-        self, chart_data: ChartData, code_data: CodeData
+        self, chart_data: ChartData, code_data: CodeData,img_path: str,
     ) -> InstructionData:
         pass

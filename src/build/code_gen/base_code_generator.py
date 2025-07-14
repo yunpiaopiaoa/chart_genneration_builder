@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from src.datamodel.annotation import CodeData
+from src.datamodel.annotation import ChartData, CodeData
 
 
 class BaseCodeGenerator:
@@ -8,5 +8,5 @@ class BaseCodeGenerator:
         pass
 
     @abstractmethod
-    def generate_code(self, chart_data)->CodeData:
+    def generate_code(self, chart_data:ChartData)->CodeData:
         pass

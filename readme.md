@@ -48,7 +48,7 @@ uv pip install -r requirements.txt
 
 将config/config.ini.template更名为config/config.ini
 
-对于build_llm，eval_llm,judge_llm，填写具体的模型访问参数;
+对于build_llm,infer_llm,eval_llm，填写具体的模型访问参数;
 
 3. 下载echarts.min.js到lib目录下
 ```
@@ -76,7 +76,7 @@ infer_dir是推理结果的目录，同时对于x2code任务将一并将存放�
 
 
 6. 评估推理结果
-需配置judge_llm参数
+需配置eval_llm参数
 ```
 python eval.py --infer_dir=results_infer --eval_dir=results_eval
 ```

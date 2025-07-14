@@ -1,68 +1,83 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 import configparser
 import json
+from math import inf
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from tqdm import tqdm
-from src.eval.evaluation import EvalProcess
-import pandas as pd
+from src.utils.calculate_score import calculate_all, calculate_all_with_weights
+from src.eval.eval_dataset import relative_paths
+from src.eval.evaluation6 import EvalProcess
 
-def main(infer_dir: str, eval_dir: str):
-    # 读取配置
-    cur_dir = Path(__file__).resolve().parent
-    config_path = cur_dir / "config" / "config.ini"
-    con = configparser.ConfigParser()
-    con.read(config_path, encoding="utf-8")
-    config = con["judge_llm"]
-    judge_llm = ChatOpenAI(temperature=0,**config)
 
-    eval_path=Path(eval_dir)
-    eval_path.mkdir(exist_ok=True,parents=True)
-    critic_dir = "src/eval/critic3"
-    eval_process = EvalProcess(judge_llm, critic_dir=critic_dir)
-    tasks = ["img2code","data2code","text2code"]
-    infer_result_dirs=list(Path(infer_dir).iterdir())
-    progress_bar = tqdm(total=len(infer_result_dirs), desc="评估任务")
-    def handle(dir: Path):
-        dic = eval_process.eval(dir, tasks)
-        with (Path(eval_dir) / f"{dir.name}.json").open("w", encoding="utf-8") as f:
-            json.dump(dic, f, ensure_ascii=False, indent=4)
-        progress_bar.update()
-        return dic
+async def main(infer_dir: str, eval_dir: str, eval_num: int, workers: int,eval_process:EvalProcess,tasks: list[str]):
+    infer_relative_dirs = list(relative_paths(Path(infer_dir)))
+    if eval_num < inf:
+        infer_relative_dirs = infer_relative_dirs[:eval_num]
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        eval_res_list = list(executor.map(handle, infer_result_dirs))
+    eval_res_list = []
+    semaphore = asyncio.Semaphore(workers)  # 控制最大并发数
 
-    # 将结果转换为 DataFrame
-    score_dic = {"better": 1, "same": 0.5, "worse": 0}
-    data = []
-    for eval_dic in eval_res_list:
-        for task, res in eval_dic.items():
-            for k, v in res.items():
-                data.append({
-                    "task": task,
-                    "metric": k,
-                    "score":score_dic[v] if v in score_dic else v/5,
-                })
+    async def process_eval(infer_relative_dir):
+        async with semaphore:  # 限制并发
+            target_path = Path(eval_dir) / f"{infer_relative_dir}.json"
+            target_path.parent.mkdir(exist_ok=True, parents=True)
+            # 调用异步 eval
+            result = await eval_process.eval(
+                Path(infer_dir) / infer_relative_dir, target_path, tasks
+            )
+            return result
 
-    df = pd.DataFrame(data)
-    # 计算各任务下的各指标的平均值，总体平均值（所有task的平均）
-    # WARNING：不使用mean函数，未正确执行的评估任务评分为0，总数仍取样本数量
-    analyze_res = df.groupby(["task", "metric"], as_index=False)["score"].sum()
-    analyze_res["score"] = analyze_res["score"]/len(eval_res_list)
-    overall_res = df.groupby("metric", as_index=False)["score"].sum()
-    overall_res["score"] = overall_res["score"]/len(eval_res_list)*len(tasks)
-    overall_res["task"] = "overall"  # 添加task标识
-    # 合并结果输出文档
-    final_res = pd.concat([analyze_res, overall_res], ignore_index=True)
-    final_res['score'] = final_res['score'].round(5)
-    final_res.to_markdown(eval_path / "analyze_res.md", index=False)
+    # 创建异步任务列表
+    coroutines = [
+        process_eval(infer_relative_dir) for infer_relative_dir in infer_relative_dirs
+    ]
+
+    pbar= tqdm(total=len(coroutines), desc="评估任务",leave=True)  
+    async for coro in asyncio.as_completed(coroutines):  # 按完成顺序获取
+        res = await coro
+        eval_res_list.append(res)
+        pbar.update(1)
+        pbar.refresh()
+    # print(f"评估结果数量：{len(eval_res_list)}")
+    calculate_all(eval_path , eval_res_list)
+    calculate_all_with_weights(eval_path, eval_res_list)
+    pbar.close()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="评估过程和结果分析")
     parser.add_argument("--infer_dir", type=str, help="推理结果目录路径")
     parser.add_argument("--eval_dir", type=str, help="评估结果保存目录路径")
+    parser.add_argument("--eval_num", type=int, default=inf, help="评估样本数量")
+    parser.add_argument("--workers", default=16, type=int, help="工作线程数")
     args = parser.parse_args()
 
-    main(args.infer_dir, args.eval_dir)
+    # 读取配置
+    cur_dir = Path(__file__).resolve().parent
+    config_path = cur_dir / "config" / "config.ini"
+    con = configparser.ConfigParser()
+    con.read(config_path, encoding="utf-8")
+    config = con["eval_llm"]
+    eval_llm = ChatOpenAI(temperature=0, **config)
+    print(f"eval model: {eval_llm.model_name}")
+    tasks = ["img2code", "data2code", "text2code", "multi_round"]
+    critic_dir = "src/eval/critic2_en"
+    eval_process = EvalProcess(eval_llm, critic_dir=critic_dir)
+    eval_path = Path(args.eval_dir)
+    eval_path.mkdir(exist_ok=True, parents=True)
+    
+    params = {
+        "infer_dir": args.infer_dir,
+        "eval_dir": args.eval_dir,
+        "eval_num": args.eval_num if args.eval_num != inf else sum(1 for _ in relative_paths(Path(args.infer_dir))),
+        "workers": args.workers,
+        "model":config["model"],
+        "temperature": eval_llm.temperature,
+        "critic_dir": critic_dir,
+        "tasks": tasks,
+    }
+    with open(Path(args.eval_dir) / "params.json", "w", encoding="utf-8") as f:
+        json.dump(params, f, ensure_ascii=False, indent=4)
+    asyncio.run(main(args.infer_dir, args.eval_dir, args.eval_num, args.workers,eval_process,tasks))

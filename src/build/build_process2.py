@@ -9,9 +9,9 @@ from langchain_core.prompts import PromptTemplate
 
 from src.build.code_gen.html_template import HtmlTemplate
 from src.build.img_gen.echarts_img_generator import EchartsImgGenerator
+from src.build.instruction_gen.instruction_gen import InstructionGen
 from src.datamodel.annotation import Annotation, ChartData, CodeData
 from src.build.img_gen.base_img_generator import BaseImgGenerator
-from src.build.instruction_gen.instruction_gen import InstructionGen
 from src.utils.extract import extract_block
 from src.datamodel.chart_type import CHARTTYPES
 
@@ -42,6 +42,8 @@ class BuildProcessForEchartsExample:
 1. 首先根据示例代码的图表类型生成一个合适的主题作为图表标题，然后根据该主题改写图表数据，使得图表内容具备实际意义；
 2. 修改后的图表类型要与示例代码的图表类型一致且风格相似；
 3. 修改后的图表布局美观，图表标题、图例和图表内容等图表元素之间无遮挡。
+4. 如果图表数据与年份相关，请尽可能修改为接近2025年份。
+5. 请你自行决定对于示例代码的参考程度，加大生成的随机性。
 请以 JSON 标准格式的字典作为返回结果(以{languege}语言为主体，不要出现"`"字符)，包含以下字段：
 code：原地修改后的图表代码，代码应该为字符串形式。
 chart_data：修改后的图表数据，是一个字典，字典的键值对的值是扁平的数据列表。
@@ -57,13 +59,34 @@ type：图表类型。图表类型与示例代码的图表类型一致，必须�
         self.html_template = HtmlTemplate()
 
     def build(self, data_path: Path, sample_dir: Path, language: str):
+        wanted  = {
+            "calendar",
+            "themeRiver",
+            "gauge",
+            "radar",
+            "candlestick",
+            "parallel",
+            "box",
+            "gantt",
+            "multi-axes",
+            "rose",
+            "sunburst",
+            "funnel",
+            "graph",
+            "polar_bar",
+            "sankey",
+            "tree",
+            "heatmap",
+            "area_chart",
+            "scatter",
+        }
         index = -1
         with ThreadPoolExecutor(max_workers=4) as executor:
             for sub_dir in data_path.iterdir():
+                if sub_dir.stem not in wanted:
+                    continue
                 for file in sub_dir.iterdir():
                     index += 1
-                    if file.stem!="pie-nest":
-                        continue
                     js_path = file / "main.js"
                     with open(js_path, "r", encoding="utf-8") as f:
                         lines = f.readlines()
@@ -93,6 +116,7 @@ type：图表类型。图表类型与示例代码的图表类型一致，必须�
                     code = self.html_template.instance(gen_script)
                     target_dir: Path = sample_dir / chart_type / f"{index}"
                     target_dir.mkdir(exist_ok=True, parents=True)
+                    img_path = f"{target_dir}/chart.png"
                     executor.submit(
                         (target_dir / "index.html").write_text, code, encoding="utf-8"
                     )
@@ -100,8 +124,11 @@ type：图表类型。图表类型与示例代码的图表类型一致，必须�
                     chart_data: ChartData = ChartData(
                         title=title, description=description, type=chart_type, data=data
                     )
+                    self.chart_img_gen.generate_img(
+                        code_data["code"], f"{target_dir}/chart.png"
+                    )
                     instructions = self.instruction_gen.generate_instruction(
-                        chart_data, code_data
+                        chart_data, code_data, img_path
                     )
                     annotation = Annotation(
                         chart=chart_data,
@@ -113,9 +140,7 @@ type：图表类型。图表类型与示例代码的图表类型一致，必须�
                         json.dumps(annotation, ensure_ascii=False, indent=4),
                         encoding="utf-8",
                     )
-                    self.chart_img_gen.generate_img(
-                        code_data["code"], f"{target_dir}/chart.png"
-                    )
+
 
     def gen_code_chartdata(self, code: str, language: str):
         """根据示例代码，修改得到新的代码和图表数据（通过大模型）"""

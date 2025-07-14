@@ -8,7 +8,6 @@ class TaskResult(TypedDict):
     task: TaskType
     scene:NotRequired[str]#任务下的具体场景，非必须
     question: list[Message]
-    ground_truth: Message
     prediction: str
 
 

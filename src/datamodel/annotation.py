@@ -1,8 +1,5 @@
-import base64
-from io import BytesIO
 from typing import Literal, NotRequired, TypedDict
 
-from PIL import Image
 from src.datamodel.task_type import TaskType
 
 
@@ -25,22 +22,11 @@ class CodeData(TypedDict):
     code: str
 
 
-# class TextContent(TypedDict):
-#     type: Literal["text"]
-#     text: str
-
-# class ImageContent(TypedDict):
-#     type: Literal["image_url"]
-#     image_url: dict[str, str]  # 或进一步定义嵌套结构
-
-# MessageContent = Union[TextContent, ImageContent]
-
-
 class MessageContent(TypedDict):
     """消息内容"""
 
     type: str = Literal["text", "image"]# 支持文本或图像
-    value: str  #type="image"时，值为base64编码
+    value: str  #type="image"时，值为本地图片路径或base64编码或在线地址
 
 
 class Message(TypedDict):
@@ -70,13 +56,3 @@ class Annotation(TypedDict):
     instructions: list[InstructionData]
 
 
-def encode_base64(img_path: str):
-    """返回图片的base64编码，附带data:image/jpeg;base64,前缀"""
-    img = Image.open(img_path)
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    buffered = BytesIO()
-    img.save(buffered, format="JPEG")
-    res = "data:image/jpeg;base64,"
-    res += base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return res

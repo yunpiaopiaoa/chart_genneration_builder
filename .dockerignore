@@ -20,6 +20,9 @@ sample/*
 output/*
 test/*
 tmp/*
+lib/*
+*.py
 
-!lib/echarts.min.js
+!infer.py
+!eval.py
 !readme.md

@@ -7,14 +7,14 @@ from src.build.img_gen.echarts_img_generator import EchartsImgGenerator
 from src.build.instruction_gen.instruction_gen import InstructionGen
 
 
-def main(gen_count: int, sample_dir: str):
+def main(sample_dir: str):
     cur_dir = Path(__file__).resolve().parent
     # 读取配置
     config_dir = cur_dir / "config"
     config_path = config_dir / "config.ini"
     con = configparser.ConfigParser()
     con.read(config_path, encoding="utf-8")
-    llm = ChatOpenAI(temperature=0.6,**con["build_llm"])
+    llm = ChatOpenAI(temperature=1,**con["build_llm"])
 
     # 定义生成器
     chart_img_gen = EchartsImgGenerator()
@@ -36,4 +36,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.gen_count, sample_dir=args.sample_dir)
+    main(sample_dir=args.sample_dir)
